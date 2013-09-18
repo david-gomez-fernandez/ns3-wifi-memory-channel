@@ -42,3 +42,6 @@ ns-3.13/waf.bat
 ns-3.13/waf-tools/
 ns-3.13/wscript
 ns-3.13/wutils.py
+ns-3.13/.lock*
+ns-3.13/build/
+ns-3.13/.waf*
