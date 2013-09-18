@@ -36,6 +36,8 @@
 #include "wifi-phy-standard.h"
 #include "interference-helper.h"
 
+#include "ns3/error-model.h"
+
 
 namespace ns3 {
 
@@ -105,6 +107,9 @@ public:
   void SetEdThreshold (double threshold);
   void SetCcaMode1Threshold (double threshold);
   void SetErrorRateModel (Ptr<ErrorRateModel> rate);
+
+  void SetErrorModel (Ptr<ErrorModel> errorModel);
+
   void SetDevice (Ptr<Object> device);
   void SetMobility (Ptr<Object> mobility);
   double GetRxNoiseFigure (void) const;
@@ -113,6 +118,7 @@ public:
   double GetEdThreshold (void) const;
   double GetCcaMode1Threshold (void) const;
   Ptr<ErrorRateModel> GetErrorRateModel (void) const;
+  Ptr<ErrorModel> GetErrorModel (void) const;
   Ptr<Object> GetDevice (void) const;
   Ptr<Object> GetMobility (void);
 
@@ -219,6 +225,10 @@ private:
   Ptr<WifiPhyStateHelper> m_state;
   InterferenceHelper m_interference;
   Time m_channelSwitchDelay;
+
+  UniformVariable m_ranvar;
+  Ptr<ErrorModel> m_errorModel;
+
 
 };
 

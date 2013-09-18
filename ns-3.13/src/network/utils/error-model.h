@@ -116,7 +116,8 @@ enum ErrorUnit
 {
   EU_BIT,
   EU_BYTE,
-  EU_PKT
+  EU_PKT,
+  EU_TIME
 };
 
 /**

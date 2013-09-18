@@ -19,6 +19,9 @@
  * This code has been ported from ns-2 (queue/errmodel.{cc,h}
  */
 
+
+#include <stdio.h>
+
 #include <math.h>
 
 #include "error-model.h"

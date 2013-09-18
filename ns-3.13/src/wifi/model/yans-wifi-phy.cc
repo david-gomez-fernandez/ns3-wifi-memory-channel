@@ -37,6 +37,13 @@
 #include "ns3/trace-source-accessor.h"
 #include <math.h>
 
+#include "ns3/error-model.h"
+//YansWifiPhy::EndReceive headers parser
+#include "ns3/wifi-mac-header.h"
+#include "ns3/llc-snap-header.h"
+#include "ns3/ipv4-header.h"
+#include "ns3/tcp-header.h"
+
 NS_LOG_COMPONENT_DEFINE ("YansWifiPhy");
 
 namespace ns3 {
@@ -121,6 +128,14 @@ YansWifiPhy::GetTypeId (void)
                                          &YansWifiPhy::GetChannelNumber),
                    MakeUintegerChecker<uint16_t> ())
 
+
+    .AddAttribute ("ErrorModel",
+	           "The receiver error model used to simulate packet loss",
+		   PointerValue(),
+		   MakePointerAccessor (&YansWifiPhy::m_errorModel),
+		   MakePointerChecker<ErrorModel>())
+
+
   ;
   return tid;
 }
@@ -129,7 +144,11 @@ YansWifiPhy::YansWifiPhy ()
   :  m_channelNumber (1),
     m_endRxEvent (),
     m_random (0.0, 1.0),
-    m_channelStartingFrequency (0)
+    m_channelStartingFrequency (0),     
+
+    m_ranvar (0.0, 1.0),
+    m_errorModel (0)
+
 {
   NS_LOG_FUNCTION (this);
   m_state = CreateObject<WifiPhyStateHelper> ();
@@ -149,6 +168,8 @@ YansWifiPhy::DoDispose (void)
   m_device = 0;
   m_mobility = 0;
   m_state = 0;
+
+  m_errorModel = 0;
 }
 
 void
@@ -241,6 +262,12 @@ YansWifiPhy::SetErrorRateModel (Ptr<ErrorRateModel> rate)
 {
   m_interference.SetErrorRateModel (rate);
 }
+
+void YansWifiPhy::SetErrorModel(Ptr<ErrorModel> errorModel)
+{
+	m_errorModel = errorModel;
+}
+
 void
 YansWifiPhy::SetDevice (Ptr<Object> device)
 {
@@ -295,6 +322,13 @@ YansWifiPhy::GetErrorRateModel (void) const
 {
   return m_interference.GetErrorRateModel ();
 }
+
+Ptr<ErrorModel> YansWifiPhy::GetErrorModel (void) const
+{
+	return m_errorModel;
+}
+
+
 Ptr<Object>
 YansWifiPhy::GetDevice (void) const
 {
@@ -774,27 +808,125 @@ YansWifiPhy::EndReceive (Ptr<Packet> packet, Ptr<InterferenceHelper::Event> even
   NS_ASSERT (IsStateRx ());
   NS_ASSERT (event->GetEndTime () == Simulator::Now ());
 
+  WifiMacHeader hdr;
+  LlcSnapHeader llcHdr;
+  Ipv4Header ipv4Hdr;
+  TcpHeader tcpHdr;
+  Ptr<Packet> pktCopy = packet->Copy();
+
   struct InterferenceHelper::SnrPer snrPer;
   snrPer = m_interference.CalculateSnrPer (event);
   m_interference.NotifyRxEnd ();
 
   NS_LOG_DEBUG ("mode=" << (event->GetPayloadMode ().GetDataRate ()) <<
                 ", snr=" << snrPer.snr << ", per=" << snrPer.per << ", size=" << packet->GetSize ());
-  if (m_random.GetValue () > snrPer.per)
-    {
-      NotifyRxEnd (packet);
-      uint32_t dataRate500KbpsUnits = event->GetPayloadMode ().GetDataRate () / 500000;
-      bool isShortPreamble = (WIFI_PREAMBLE_SHORT == event->GetPreambleType ());
-      double signalDbm = RatioToDb (event->GetRxPowerW ()) + 30;
-      double noiseDbm = RatioToDb (event->GetRxPowerW () / snrPer.snr) - GetRxNoiseFigure () + 30;
-      NotifyMonitorSniffRx (packet, (uint16_t)GetChannelFrequencyMhz (), GetChannelNumber (), dataRate500KbpsUnits, isShortPreamble, signalDbm, noiseDbm);
-      m_state->SwitchFromRxEndOk (packet, snrPer.snr, event->GetPayloadMode (), event->GetPreambleType ());
-    }
-  else
-    {
-      /* failure. */
-      NotifyRxDrop (packet);
-      m_state->SwitchFromRxEndError (packet, snrPer.snr);
-    }
+
+  if (m_errorModel)
+  {
+	  if (m_errorModel->IsEnabled())
+	  {
+		  if (m_errorModel && m_errorModel->IsCorrupt(packet)) 			//Error
+		  {
+			  NS_LOG_LOGIC("CORRUPT!!! Dropping pkt due to error model (" << this <<")");
+			  NotifyRxDrop (packet);
+			  m_state->SwitchFromRxEndError (packet, snrPer.snr);
+			  return;
+		  }
+		  else      	//Correct reception
+		  {
+			  NS_LOG_LOGIC("CORRECT!!! (" << this <<")");
+			  NotifyRxEnd (packet);
+			  uint32_t dataRate500KbpsUnits = event->GetPayloadMode ().GetDataRate () / 500000;
+			  bool isShortPreamble = (WIFI_PREAMBLE_SHORT == event->GetPreambleType ());
+			  double signalDbm = RatioToDb (event->GetRxPowerW ()) + 30;
+			  double noiseDbm = RatioToDb (event->GetRxPowerW () / snrPer.snr) - GetRxNoiseFigure () + 30;
+			  NotifyMonitorSniffRx (packet, (uint16_t)GetChannelFrequencyMhz (), GetChannelNumber (), dataRate500KbpsUnits, isShortPreamble, signalDbm, noiseDbm);
+			  m_state->SwitchFromRxEndOk (packet, snrPer.snr, event->GetPayloadMode (), event->GetPreambleType ());
+			  return;
+		  }
+	  }
+  }
+
+
+
+  else     //For NS-3 default error rate model (NIST/YANS)
+  {
+	  //Force the IEEE 802.11 ACK frames and all broadcast/control/management messages to be correct
+	  pktCopy->RemoveHeader(hdr);
+	  //Decide whether the frame is correct or not according to the frame type (data, TCP or broadcast/control)
+	  if (hdr.IsData() && !hdr.GetAddr1().IsBroadcast())
+	  {
+		  //We have split the packet decision into the following three conditions:
+		  // - ARP frames --> Always correct
+		  // - TCP ACK --> Always correct
+		  // - Data frames --> Legacy HMM decision process
+
+		  pktCopy->RemoveHeader(llcHdr);
+
+		  switch (llcHdr.GetType())
+		  {
+		  case 0x0806:			//ARP
+			  snrPer.per = snrPer.per;
+			  break;
+		  case 0x0800:			//IP packet
+			  pktCopy->RemoveHeader(ipv4Hdr);
+			  switch (ipv4Hdr.GetProtocol())
+			  {
+			  case 6:				//TCP
+				  pktCopy->RemoveHeader(tcpHdr);
+				  //Data segments --> To be errored
+				  if (pktCopy->GetSize() > 4)
+					  snrPer.per = snrPer.per;
+				  else
+					  snrPer.per = 0;
+				  break;
+			  case 17:			//UDP
+				  snrPer.per = snrPer.per;
+				  break;
+			  default:
+				  NS_LOG_ERROR ("Protocol not implemented yet (IP) --> " << ipv4Hdr.GetProtocol());
+				  break;
+			  }
+			  break;
+			  default:
+				  NS_LOG_ERROR ("Protocol not implemented yet (LLC) --> " << llcHdr.GetType());
+				  break;
+		  }
+	  }
+	  else if (hdr.IsAck())
+		  snrPer.per = 0;
+	  else if (hdr.IsCtl() || hdr.IsMgt() || (hdr.GetAddr1()).IsBroadcast())
+		  snrPer.per = 0;
+	  else
+		  snrPer.per = 0;
+
+	  NS_LOG_DEBUG("SNR = " << 10*log10 (snrPer.snr) << " dB | PER = " << snrPer.per << " | Packet length =" << packet->GetSize());
+
+
+	  ////////////////////LEGACY NS-3 Code//////////////
+	  if (m_ranvar.GetValue () > snrPer.per)
+	  {
+		  NotifyRxEnd (packet);
+		  uint32_t dataRate500KbpsUnits = event->GetPayloadMode ().GetDataRate () / 500000;
+		  bool isShortPreamble = (WIFI_PREAMBLE_SHORT == event->GetPreambleType ());
+		  double signalDbm = RatioToDb (event->GetRxPowerW ()) + 30;
+		  double noiseDbm = RatioToDb (event->GetRxPowerW () / snrPer.snr) - GetRxNoiseFigure () + 30;
+		  NotifyMonitorSniffRx (packet, (uint16_t)GetChannelFrequencyMhz (), GetChannelNumber (), dataRate500KbpsUnits, isShortPreamble, signalDbm, noiseDbm);
+		  m_state->SwitchFromRxEndOk (packet, snrPer.snr, event->GetPayloadMode (), event->GetPreambleType ());
+	  }
+	  else
+	  {
+		  /* failure. */
+		  NotifyRxDrop (packet);
+		  m_state->SwitchFromRxEndError (packet, snrPer.snr);
+	  }
+	  ////////////////////LEGACY NS-3 Code//////////////
+
+
+  }
+
+ 
+
+
 }
 } // namespace ns3

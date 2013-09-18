@@ -45,3 +45,4 @@ ns-3.13/wutils.py
 ns-3.13/.lock*
 ns-3.13/build/
 ns-3.13/.waf*
+ns-3.13/traces/
