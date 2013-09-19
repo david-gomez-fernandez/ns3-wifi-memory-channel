@@ -38,6 +38,12 @@
 
 #include "ns3/error-model.h"
 
+////David/Ramón
+#include "ns3/mac48-address.h"
+#include "ns3/node-list.h"
+#include "ns3/ipv4.h"
+////End David/Ramón
+
 
 namespace ns3 {
 
@@ -65,6 +71,23 @@ class WifiPhyStateHelper;
 class YansWifiPhy : public WifiPhy
 {
 public:
+
+	////David/Ramón --> Adding a new callback mechanism to
+	/**
+	 * arg1: packet received successfully
+	 * arg2: snr of packet
+	 * arg3: True --> Correct reception; otherwise, corrupted frame
+	 * arg3: nodeId ID of the node which has received the frame
+	 */
+	typedef Callback<void,Ptr<Packet>, bool, double, int> PhyRxCallback;
+	/**
+	 * arg1: packet received unsuccessfully
+	 * arg2: snr of packet
+	 * arg3: nodeId ID of the node which has received the frame
+	 */
+	typedef Callback<void,Ptr<Packet>, double, int> PhyRxErrorCallback;
+	////End David/Ramón
+
   static TypeId GetTypeId (void);
 
   YansWifiPhy ();
@@ -122,14 +145,16 @@ public:
   Ptr<Object> GetDevice (void) const;
   Ptr<Object> GetMobility (void);
 
-
-
-
   virtual double GetTxPowerStart (void) const;
   virtual double GetTxPowerEnd (void) const;
   virtual uint32_t GetNTxPower (void) const;
   virtual void SetReceiveOkCallback (WifiPhy::RxOkCallback callback);
   virtual void SetReceiveErrorCallback (WifiPhy::RxErrorCallback callback);
+
+  ////David/Ramón
+  void SetPhyReceiveCallback (PhyRxCallback callback);
+  ////David/Ramón
+
   virtual void SendPacket (Ptr<const Packet> packet, WifiMode mode, enum WifiPreamble preamble, uint8_t txPowerLevel);
   virtual void RegisterListener (WifiPhyListener *listener);
   virtual bool IsStateCcaBusy (void);
@@ -227,9 +252,12 @@ private:
   Time m_channelSwitchDelay;
 
   UniformVariable m_ranvar;
+
+  ////David/Ramón
   Ptr<ErrorModel> m_errorModel;
-
-
+  PhyRxCallback m_phyRxCallback;
+  PhyRxErrorCallback m_phyRxErrorCallback;
+  ////David/Ramón
 };
 
 } // namespace ns3

@@ -66,6 +66,7 @@ PropagationLossModel::CalcRxPower (double txPowerDbm,
                                    Ptr<MobilityModel> b) const
 {
   double self = DoCalcRxPower (txPowerDbm, a, b);
+
   if (m_next != 0)
     {
       self = m_next->CalcRxPower (self, a, b);
@@ -87,7 +88,7 @@ RandomPropagationLossModel::GetTypeId (void)
                    RandomVariableValue (ConstantVariable (1.0)),
                    MakeRandomVariableAccessor (&RandomPropagationLossModel::m_variable),
                    MakeRandomVariableChecker ())
-  ;
+     ;
   return tid;
 }
 RandomPropagationLossModel::RandomPropagationLossModel ()
@@ -488,6 +489,10 @@ LogDistancePropagationLossModel::DoCalcRxPower (double txPowerDbm,
   double rxc = -m_referenceLoss - pathLossDb;
   NS_LOG_DEBUG ("distance="<<distance<<"m, reference-attenuation="<< -m_referenceLoss<<"dB, "<<
                 "attenuation coefficient="<<rxc<<"db");
+
+  ////David/Ramón
+//  NS_LOG_UNCOND ("LogDistance (" << this << ") --> Distance " << distance << "m TX - " << txPowerDbm << "dBm RX - " << txPowerDbm + rxc <<"dBm" );
+
   return txPowerDbm + rxc;
 }
 
@@ -743,10 +748,13 @@ MatrixPropagationLossModel::GetTypeId (void)
 MatrixPropagationLossModel::MatrixPropagationLossModel ()
   : PropagationLossModel (), m_default (std::numeric_limits<double>::max ())
 {
+	NS_LOG_FUNCTION(this);
+
 }
 
 MatrixPropagationLossModel::~MatrixPropagationLossModel ()
 {
+	NS_LOG_FUNCTION(this);
 }
 
 void 
@@ -786,13 +794,9 @@ MatrixPropagationLossModel::DoCalcRxPower (double txPowerDbm,
   std::map<MobilityPair, double>::const_iterator i = m_loss.find (std::make_pair (a, b));
 
   if (i != m_loss.end ())
-    {
       return txPowerDbm - i->second;
-    }
   else
-    {
       return txPowerDbm - m_default;
-    }
 }
 
 // ------------------------------------------------------------------------- //
@@ -810,12 +814,30 @@ RangePropagationLossModel::GetTypeId (void)
                    DoubleValue (250),
                    MakeDoubleAccessor (&RangePropagationLossModel::m_range),
                    MakeDoubleChecker<double> ())
+    ////David/Ramón
+    .AddAttribute ("FirstRangeDistance",
+                   "XXX",
+                   DoubleValue (20),
+                   MakeDoubleAccessor (&RangePropagationLossModel::m_firstRangeDistance),
+                   MakeDoubleChecker<double> ())
+    .AddAttribute ("SecondRangeDistance",
+                   "XXX",
+                   DoubleValue (40),
+                   MakeDoubleAccessor (&RangePropagationLossModel::m_secondRangeDistance),
+                   MakeDoubleChecker<double> ())
+    ////End David/Ramón
   ;
   return tid;
 }
 
 RangePropagationLossModel::RangePropagationLossModel ()
 {
+	NS_LOG_FUNCTION_NOARGS();
+}
+
+RangePropagationLossModel::~RangePropagationLossModel ()
+{
+	NS_LOG_FUNCTION_NOARGS();
 }
 
 double
@@ -823,20 +845,29 @@ RangePropagationLossModel::DoCalcRxPower (double txPowerDbm,
                                           Ptr<MobilityModel> a,
                                           Ptr<MobilityModel> b) const
 {
+
   double distance = a->GetDistanceFrom (b);
-  if (distance <= m_range)
-    {
-      return txPowerDbm;
-    }
+
+  ////David/Ramón --> Change the operation
+//  if (distance <= m_range)
+//    {
+//      return txPowerDbm;
+//    }
+//  else
+//    {
+//      return -1000;
+//    }
+
+  if (distance <= m_firstRangeDistance)
+	  return txPowerDbm;
+  else if (distance <= m_secondRangeDistance)
+	  return txPowerDbm - 130.0;
   else
-    {
-      return -1000;
-    }
+	  return -1000;
+
 }
 
 ////////////////  SimplePropagationLossModel (authors: David Gómez Fernández / Ramón Agüero Calvo)   //////////////////
-
-
 NS_OBJECT_ENSURE_REGISTERED (SimplePropagationLossModel);
 
 TypeId
@@ -951,4 +982,6 @@ double SimplePropagationLossModel::DoCalcRxPower(double txPowerDbm, Ptr<Mobility
 		return txPowerDbm;
 	}
 }
+
+
 } // namespace ns3

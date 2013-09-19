@@ -533,7 +533,7 @@ private:
   /// default loss
   double m_default; 
 
-  typedef std::pair< Ptr<MobilityModel>, Ptr<MobilityModel> > MobilityPair; 
+  typedef std::pair< Ptr<MobilityModel>, Ptr<MobilityModel> > MobilityPair;
   /// Fixed loss between pair of nodes
   std::map<MobilityPair, double> m_loss;
 };
@@ -553,6 +553,10 @@ class RangePropagationLossModel : public PropagationLossModel
 public:
   static TypeId GetTypeId (void);
   RangePropagationLossModel ();
+
+  ////David/Ramón
+  virtual ~RangePropagationLossModel ();
+
 private:
   RangePropagationLossModel (const RangePropagationLossModel& o);
   RangePropagationLossModel& operator= (const RangePropagationLossModel& o);
@@ -561,9 +565,14 @@ private:
                                 Ptr<MobilityModel> b) const;
 private:
   double m_range;
+
+  ////David/Ramón
+  double m_firstRangeDistance;
+  double m_secondRangeDistance;
+
 };
 
-
+////David/Ramón
 //////////////////  SimplePropagationLossModel (authors: David Gómez Fernández / Ramón Agüero Calvo)   //////////////////
 
 /**
@@ -578,7 +587,7 @@ private:
  *			   /               1,					  if 	 0 <= x < alpha * d_max
  *			   |
  *			   |      1 - (x/(d_max))^beta
- *  1 - FER =  <     ------------------------ , 	  if     alpha * d_max <= x <= d_max
+ *  1 - FER = <      ------------------------ , 	  if     alpha * d_max <= x <= d_max
  *			   |		1 - alpha^beta
  *			   |
  *			   \		  	   0,					  if 	 d_max < x
@@ -622,8 +631,6 @@ public:
 	 */
 	float GetMaxDistance(void) const;
 
-
-
 private:
 	SimplePropagationLossModel (const SimplePropagationLossModel& o);
 	SimplePropagationLossModel & operator=(const SimplePropagationLossModel& o);
@@ -635,7 +642,6 @@ private:
 	float m_alpha;
 	float m_beta;
 	RandomVariable m_ranvar;
-
 };
 
 

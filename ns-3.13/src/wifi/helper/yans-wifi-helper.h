@@ -150,7 +150,6 @@ private:
 
   std::vector<Ptr <PropagationLossModel> > m_propagationLossModelVector;
 
-
 };
 
 /**
@@ -191,6 +190,11 @@ public:
    * Every PHY created by a call to Install is associated to this channel.
    */
   void SetChannel (std::string channelName);
+
+  ////David/Ramón
+  inline Ptr<YansWifiChannel> GetChannel () {return m_channel;}
+  ////End David/Ramón
+
   /**
    * \param name the name of the attribute to set
    * \param v the value of the attribute

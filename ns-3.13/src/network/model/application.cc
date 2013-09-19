@@ -115,6 +115,28 @@ void Application::StopApplication ()
 { // Provide null functionality in case subclass is not interested
 }
 
+////David/Ramón
+Ptr<Packet> Application::CreateRandomPayload (u_int32_t packetLength)
+{
+	u_int32_t i;
+	UniformVariable ranvar (0, 255);
+	u_int8_t *buffer;
+	Ptr<Packet> resultPkt;
+
+	buffer = (u_int8_t *) malloc (packetLength);
+	for (i = 0; i < packetLength; i++ )
+	{
+		buffer [i] = ranvar.GetInteger(0,255);
+	}
+
+	resultPkt = Create<Packet> (buffer, packetLength);
+
+	free (buffer);
+	return resultPkt;
+}
+////David/Ramón
+
+
 } // namespace ns3
 
 

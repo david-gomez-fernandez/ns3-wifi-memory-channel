@@ -26,6 +26,7 @@
 #include "ns3/object.h"
 #include "ns3/ptr.h"
 #include "ns3/node.h"
+#include "ns3/packet.h"			////David/Ramón
 
 namespace ns3 {
 
@@ -100,6 +101,15 @@ public:
    * \param node the node to which this Application object is attached.
    */
   void SetNode (Ptr<Node> node);
+
+  ////David/Ramón
+  /**
+   * Create a random-filled packet of a determined size
+   * \param size Packet size to fill
+   * \returns A packet with random data content (Payload)
+   */
+  Ptr<Packet> CreateRandomPayload (u_int32_t size);
+  ////End David/Ramón
 
 private:
   /**
